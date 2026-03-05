@@ -1,0 +1,122 @@
+{
+  "employees": [
+    {
+      "id": "EMP-1772703629922",
+      "firstName": "wilfred",
+      "lastName": "guillen",
+      "country": "United States",
+      "state": "",
+      "city": "",
+      "address": "",
+      "postalCode": "",
+      "phone": "7863821366",
+      "email": "wilfre108199@gmail.com",
+      "idType": "SSN",
+      "idNumber": "",
+      "role": "Admin",
+      "status": "Activo",
+      "paymentMethod": "Transferencia",
+      "pin": "4428",
+      "createdAt": "2026-03-05T09:40:29.922Z",
+      "fullName": "wilfred guillen"
+    }
+  ],
+  "attendance": [
+    {
+      "id": "AT-1772703651116",
+      "employeeId": "EMP-1772703629922",
+      "employeeName": "wilfred guillen",
+      "action": "Entrada",
+      "timestamp": "2026-03-05T09:40:51.116Z",
+      "dateKey": "2026-03-05"
+    },
+    {
+      "id": "AT-1772703657542",
+      "employeeId": "EMP-1772703629922",
+      "employeeName": "wilfred guillen",
+      "action": "Salida",
+      "timestamp": "2026-03-05T09:40:57.542Z",
+      "dateKey": "2026-03-05"
+    }
+  ],
+  "orders": [
+    {
+      "id": "ORD-5555",
+      "number": 5555,
+      "customerName": "eduardo",
+      "customerPhone": "-",
+      "orderLabel": "",
+      "serviceMode": "takeaway",
+      "lines": [
+        {
+          "lineKey": "Galletas-medium-full-Frutas frescas",
+          "itemName": "Galletas",
+          "category": "dessert",
+          "size": "medium",
+          "crust": "",
+          "bake": "",
+          "mode": "full",
+          "pizzaProfile": null,
+          "toppings": [
+            "Frutas frescas"
+          ],
+          "qty": 1,
+          "unitPrice": 4.2
+        }
+      ],
+      "subtotal": 4.2,
+      "discount": 0,
+      "total": 4.2,
+      "status": "Cancelada",
+      "payment": "Pendiente",
+      "note": "",
+      "createdAt": "2026-03-05T09:30:14.927Z",
+      "updatedAt": "2026-03-05T09:33:27.081Z"
+    },
+    {
+      "id": "ORD-5556",
+      "number": 5556,
+      "customerName": "Consumidor final",
+      "customerPhone": "-",
+      "orderLabel": "",
+      "serviceMode": "takeaway",
+      "lines": [
+        {
+          "lineKey": "Party Pack-small-regular-normal-pizza-Cebolla-Aceituna|Cebolla|Bacon-Extra queso|Hongos",
+          "itemName": "Party Pack",
+          "category": "pizza",
+          "size": "small",
+          "crust": "regular",
+          "bake": "normal",
+          "mode": "full",
+          "pizzaProfile": {
+            "left": [
+              "Cebolla"
+            ],
+            "right": [
+              "Aceituna",
+              "Cebolla",
+              "Bacon"
+            ],
+            "full": [
+              "Extra queso",
+              "Hongos"
+            ]
+          },
+          "toppings": [],
+          "qty": 1,
+          "unitPrice": 29.88,
+          "note": ""
+        }
+      ],
+      "subtotal": 29.88,
+      "discount": 0,
+      "total": 29.88,
+      "status": "Cancelada",
+      "payment": "Pendiente",
+      "note": "",
+      "createdAt": "2026-03-05T09:33:17.887Z",
+      "updatedAt": "2026-03-05T09:33:23.985Z"
+    }
+  ]
+}
