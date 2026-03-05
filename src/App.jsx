@@ -225,6 +225,7 @@ const toMoney = (value) =>
 
 const formatHours = (hours) => `${hours.toFixed(2)} h`
 const DEMO_DB_KEY = 'wigo-pos-demo-db-v1'
+const IS_STATIC_DEMO = typeof window !== 'undefined' && window.location.hostname.includes('github.io')
 
 const isPrivilegedRole = (role = '') => {
   const normalized = String(role).trim().toLowerCase()
@@ -267,7 +268,14 @@ const generateDemoPin = (employees, role = '') => {
 const readDemoDb = () => {
   try {
     const raw = window.localStorage.getItem(DEMO_DB_KEY)
-    if (raw) return JSON.parse(raw)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      return {
+        employees: Array.isArray(parsed?.employees) ? parsed.employees : [],
+        attendance: Array.isArray(parsed?.attendance) ? parsed.attendance : [],
+        orders: Array.isArray(parsed?.orders) ? parsed.orders : [],
+      }
+    }
   } catch {
     // ignore localStorage parse issues and reset db
   }
@@ -680,6 +688,9 @@ function App() {
   }, [cartItems, noteLineKey])
 
   const fetchJson = async (path, options = {}) => {
+    if (IS_STATIC_DEMO) {
+      return mockFetchJson(path, options)
+    }
     try {
       const res = await fetch(`${API_BASE}${path}`, {
         headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
