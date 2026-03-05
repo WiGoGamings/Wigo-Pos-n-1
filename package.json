@@ -12,6 +12,7 @@
     "dev:api": "node api/server.mjs",
     "dev:all": "node scripts/dev-all.mjs",
     "build": "vite build",
+    "build:pages": "cross-env VITE_BASE_PATH=/Wigo-Pos-n-1/ vite build",
     "build:desktop": "npm run build && electron-builder --win nsis",
     "lint": "eslint .",
     "preview": "vite preview"
