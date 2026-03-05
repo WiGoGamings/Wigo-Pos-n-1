@@ -45,9 +45,11 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "build/**/*",
       "package.json"
     ],
     "win": {
+      "icon": "build/app.ico",
       "signAndEditExecutable": false,
       "target": [
         {
@@ -62,7 +64,9 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "installerIcon": "build/app.ico",
+      "uninstallerIcon": "build/app.ico"
     }
   }
 }
