@@ -224,6 +224,225 @@ const toMoney = (value) =>
   })
 
 const formatHours = (hours) => `${hours.toFixed(2)} h`
+const DEMO_DB_KEY = 'wigo-pos-demo-db-v1'
+
+const isPrivilegedRole = (role = '') => {
+  const normalized = String(role).trim().toLowerCase()
+  return normalized === 'admin' || normalized === 'administrador' || normalized === 'system' || normalized === 'systempos'
+}
+
+const getRolePinRange = (role = '') => {
+  const normalized = String(role).trim().toLowerCase()
+  if (normalized.includes('super')) return [2001, 2999]
+  if (normalized.includes('caj')) return [3001, 3999]
+  if (normalized.includes('mes')) return [4001, 4999]
+  return [5001, 9999]
+}
+
+const hasPrivilegedEmployee = (employees, ignoreId = '') =>
+  employees.some((emp) => emp.id !== ignoreId && isPrivilegedRole(emp.role))
+
+const generateDemoPin = (employees, role = '') => {
+  const used = new Set(employees.map((emp) => emp.pin))
+  let min = 1000
+  let max = 1990
+  let validator = () => true
+
+  if (isPrivilegedRole(role)) {
+    validator = (pin) => pin.endsWith('0')
+  } else {
+    ;[min, max] = getRolePinRange(role)
+  }
+
+  const candidates = []
+  for (let value = min; value <= max; value += 1) {
+    const pin = String(value)
+    if (pin.length !== 4 || used.has(pin) || !validator(pin)) continue
+    candidates.push(pin)
+  }
+  if (!candidates.length) return ''
+  return candidates[Math.floor(Math.random() * candidates.length)]
+}
+
+const readDemoDb = () => {
+  try {
+    const raw = window.localStorage.getItem(DEMO_DB_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch {
+    // ignore localStorage parse issues and reset db
+  }
+  return { employees: [], attendance: [], orders: [] }
+}
+
+const writeDemoDb = (db) => {
+  window.localStorage.setItem(DEMO_DB_KEY, JSON.stringify(db))
+}
+
+const getWeeklyLogs = (db, employeeId) => {
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+  return db.attendance
+    .filter((log) => log.employeeId === employeeId && new Date(log.timestamp).getTime() >= weekAgo)
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+}
+
+const nextActionForEmployee = (db, employeeId) => {
+  const logs = db.attendance
+    .filter((log) => log.employeeId === employeeId)
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+  if (!logs.length) return 'Entrada'
+  return logs[0].action === 'Entrada' ? 'Salida' : 'Entrada'
+}
+
+const generateHistoryRows = (period = 'Diario') => {
+  const configs = {
+    Diario: Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`),
+    Semanal: ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'],
+    Mensual: Array.from({ length: 30 }, (_, i) => `D${i + 1}`),
+    Anual: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+  }
+  const labels = configs[period] || configs.Diario
+  return labels.map((label, idx) => {
+    const sales = Math.max(220, Math.round(1200 + Math.sin(idx * 0.42) * 460 + Math.cos(idx * 0.17) * 210))
+    const promos = Math.round(sales * (0.08 + (idx % 5) * 0.01))
+    const discounts = Math.round(sales * (0.05 + (idx % 4) * 0.008))
+    const expenses = Math.round(sales * (0.32 + (idx % 3) * 0.04))
+    return { label, sales, promos, discounts, expenses }
+  })
+}
+
+const buildDemoSummary = () => {
+  const rows = generateHistoryRows('Diario')
+  const sales = rows.reduce((sum, r) => sum + r.sales, 0)
+  const promos = rows.reduce((sum, r) => sum + r.promos, 0)
+  const discounts = rows.reduce((sum, r) => sum + r.discounts, 0)
+  const expenses = rows.reduce((sum, r) => sum + r.expenses, 0)
+  const progress = ((sales - expenses) / Math.max(sales, 1)) * 100
+  return { sales, promos, discounts, expenses, progress }
+}
+
+const mockFetchJson = async (path, options = {}) => {
+  const method = String(options.method || 'GET').toUpperCase()
+  const url = new URL(path, 'https://local.mock')
+  const db = readDemoDb()
+
+  if (url.pathname === '/api/admin/summary' && method === 'GET') return buildDemoSummary()
+  if (url.pathname === '/api/admin/day' && method === 'GET') return { rows: generateHistoryRows('Diario') }
+  if (url.pathname === '/api/admin/history' && method === 'GET') return { rows: generateHistoryRows(url.searchParams.get('period') || 'Diario') }
+  if (url.pathname === '/api/admin/live' && method === 'GET') {
+    const liveTrend = Array.from({ length: 10 }, (_, idx) => {
+      const v = 65 + Math.sin((Date.now() / 1000 + idx) * 0.36) * 22 + Math.cos((Date.now() / 1000 + idx) * 0.22) * 8
+      return Math.min(100, Math.max(35, Math.round(v)))
+    })
+    return { liveTrend }
+  }
+
+  if (url.pathname === '/api/orders' && method === 'GET') return { orders: db.orders }
+  if (url.pathname === '/api/orders' && method === 'POST') {
+    const order = JSON.parse(options.body || '{}')
+    const saved = { ...order, createdAt: order.createdAt || new Date().toISOString() }
+    db.orders = [saved, ...db.orders.filter((row) => row.id !== saved.id)]
+    writeDemoDb(db)
+    return { order: saved }
+  }
+  if (url.pathname.startsWith('/api/orders/') && method === 'PUT') {
+    const orderId = decodeURIComponent(url.pathname.split('/').pop())
+    const payload = JSON.parse(options.body || '{}')
+    let updated = null
+    db.orders = db.orders.map((row) => {
+      if (row.id !== orderId) return row
+      updated = { ...row, ...payload, updatedAt: payload.updatedAt || new Date().toISOString() }
+      return updated
+    })
+    if (!updated) throw new Error('HTTP 404')
+    writeDemoDb(db)
+    return { order: updated }
+  }
+
+  if (url.pathname === '/api/employees' && method === 'GET') return { employees: db.employees }
+  if (url.pathname === '/api/employees' && method === 'POST') {
+    const payload = JSON.parse(options.body || '{}')
+    const role = String(payload.role || 'Empleado').trim()
+    if (isPrivilegedRole(role) && hasPrivilegedEmployee(db.employees)) throw new Error('Ya existe un usuario System/Admin')
+    const pin = generateDemoPin(db.employees, role)
+    if (!pin) throw new Error('No hay PIN disponibles')
+    const employee = {
+      id: `EMP-${Date.now()}`,
+      ...payload,
+      role,
+      pin,
+      fullName: `${payload.firstName || ''} ${payload.lastName || ''}`.trim(),
+      accessLevel: isPrivilegedRole(role) ? 'system-admin' : 'standard',
+      createdAt: new Date().toISOString(),
+    }
+    db.employees.push(employee)
+    writeDemoDb(db)
+    return { employee, generatedPin: pin }
+  }
+  if (url.pathname.startsWith('/api/employees/') && method === 'PUT') {
+    const employeeId = decodeURIComponent(url.pathname.split('/').pop())
+    const payload = JSON.parse(options.body || '{}')
+    const idx = db.employees.findIndex((emp) => emp.id === employeeId)
+    if (idx < 0) throw new Error('HTTP 404')
+    const current = db.employees[idx]
+    const nextRole = payload.role ? String(payload.role).trim() : current.role
+    if (isPrivilegedRole(nextRole) && hasPrivilegedEmployee(db.employees, current.id)) throw new Error('Ya existe un usuario System/Admin')
+    const next = { ...current, ...payload }
+    if (payload.role && payload.role !== current.role) {
+      const pin = generateDemoPin(db.employees.filter((emp) => emp.id !== current.id), nextRole)
+      if (!pin) throw new Error('No hay PIN disponibles')
+      next.pin = pin
+      next.accessLevel = isPrivilegedRole(nextRole) ? 'system-admin' : 'standard'
+    }
+    next.fullName = `${next.firstName || ''} ${next.lastName || ''}`.trim()
+    db.employees[idx] = next
+    writeDemoDb(db)
+    return { employee: next }
+  }
+  if (url.pathname.startsWith('/api/employees/') && method === 'DELETE') {
+    const employeeId = decodeURIComponent(url.pathname.split('/').pop())
+    db.employees = db.employees.filter((emp) => emp.id !== employeeId)
+    db.attendance = db.attendance.filter((log) => log.employeeId !== employeeId)
+    writeDemoDb(db)
+    return { ok: true }
+  }
+
+  if (url.pathname === '/api/auth/pin' && method === 'POST') {
+    const payload = JSON.parse(options.body || '{}')
+    const employee = db.employees.find((emp) => emp.pin === String(payload.pin || '').trim())
+    if (!employee) throw new Error('HTTP 404')
+    return {
+      employee,
+      weeklyHistory: getWeeklyLogs(db, employee.id),
+      nextAction: nextActionForEmployee(db, employee.id),
+    }
+  }
+  if (url.pathname === '/api/attendance/punch' && method === 'POST') {
+    const payload = JSON.parse(options.body || '{}')
+    const pin = String(payload.pin || '').trim()
+    const employee = db.employees.find((emp) => emp.pin === pin)
+    if (!employee) throw new Error('HTTP 404')
+    const action = nextActionForEmployee(db, employee.id)
+    db.attendance.push({
+      id: `AT-${Date.now()}`,
+      employeeId: employee.id,
+      employeeName: employee.fullName || `${employee.firstName || ''} ${employee.lastName || ''}`.trim(),
+      action,
+      timestamp: new Date().toISOString(),
+    })
+    writeDemoDb(db)
+    return {
+      message: action === 'Entrada' ? 'Hora de entrada confirmada' : 'Hora de salida confirmada',
+      action,
+      weeklyHistory: getWeeklyLogs(db, employee.id),
+    }
+  }
+  if (url.pathname === '/api/attendance/history' && method === 'GET') {
+    const employeeId = url.searchParams.get('employeeId')
+    return { weeklyHistory: getWeeklyLogs(db, employeeId) }
+  }
+
+  throw new Error('HTTP 404')
+}
 
 const calculateWorkedHours = (weeklyHistory = []) => {
   const sorted = [...weeklyHistory].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
@@ -461,12 +680,17 @@ function App() {
   }, [cartItems, noteLineKey])
 
   const fetchJson = async (path, options = {}) => {
-    const res = await fetch(`${API_BASE}${path}`, {
-      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-      ...options,
-    })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    return res.json()
+    try {
+      const res = await fetch(`${API_BASE}${path}`, {
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+        ...options,
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return res.json()
+    } catch {
+      // Fallback for static hosting (e.g., GitHub Pages) where backend API is unavailable.
+      return mockFetchJson(path, options)
+    }
   }
 
   const loadSummary = async () => {
